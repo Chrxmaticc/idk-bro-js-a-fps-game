@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Breakout Prototype</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #222; touch-action: none; font-family: sans-serif; }
+        canvas { display: block; }
+        #crosshair {
+            position: absolute; top: 50%; left: 50%; width: 6px; height: 6px;
+            background: rgba(255, 255, 255, 0.8); border-radius: 50%;
+            transform: translate(-50%, -50%); pointer-events: none;
+        }
+        #ui { position: absolute; top: 20px; left: 20px; color: white; font-size: 18px; pointer-events: none; }
+        #controls { position: absolute; bottom: 20px; left: 0; width: 100%; display: flex; justify-content: space-between; padding: 0 20px; box-sizing: border-box; pointer-events: none; }
+        .btn-group { display: flex; gap: 10px; pointer-events: auto; flex-wrap: wrap; width: 150px;}
+        .btn {
+            width: 50px; height: 50px; background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5); border-radius: 50%;
+            color: white; font-size: 14px; display: flex; align-items: center;
+            justify-content: center; user-select: none; text-align: center;
+        }
+        .btn:active { background: rgba(255, 255, 255, 0.5); }
+        #shoot-btn { background: rgba(255, 0, 0, 0.3); border-color: red; width: 70px; height: 70px; font-size: 20px;}
+        #grab-btn { background: rgba(0, 150, 255, 0.3); border-color: blue; }
+    </style>
+</head>
+<body>
+    <div id="crosshair"></div>
+    <div id="ui">Ammo: <span id="ammo">7</span></div>
+    
+    <div id="controls">
+        <div class="btn-group" style="flex-direction: column; gap: 5px;">
+            <div class="btn" id="up-btn">W</div>
+            <div style="display:flex; gap:5px;">
+                <div class="btn" id="left-btn">A</div>
+                <div class="btn" id="down-btn">S</div>
+                <div class="btn" id="right-btn">D</div>
+            </div>
+        </div>
+        <div class="btn-group" style="justify-content: flex-end;">
+            <div class="btn" id="slide-btn">SLIDE</div>
+            <div class="btn" id="dive-btn">DIVE</div>
+            <div class="btn" id="grab-btn">GRAB</div>
+            <div class="btn" id="shoot-btn">FIRE</div>
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { updateMovement, setupMovement, playerState } from './movement.js';
+        import { setupGun, updateGun, shootGun } from './guns.js';
+        import { setupHostage, updateHostage, toggleGrab } from './hostage.js';
+
+        // Setup Scene
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x444444);
+        scene.fog = new THREE.Fog(0x444444, 10, 50);
+
+        const camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 1.6, 10);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Lighting
+        scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        dirLight.position.set(10, 20, 10);
+        scene.add(dirLight);
+
+        // --- MAP GENERATION ---
+        const mapGroup = new THREE.Group();
+        scene.add(mapGroup);
+
+        // Baseplate Floor
+        const floorGeo = new THREE.BoxGeometry(40, 1, 40);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x555555 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.position.y = -0.5;
+        mapGroup.add(floor);
+
+        // Walls
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+        const wallPositions = [
+            { pos: [0, 2, -20], scale: [40, 4, 1] }, // Back
+            { pos: [0, 2, 20], scale: [40, 4, 1] },  // Front
+            { pos: [-20, 2, 0], scale: [1, 4, 40] }, // Left
+            { pos: [20, 2, 0], scale: [1, 4, 40] }   // Right
+        ];
+        wallPositions.forEach(w => {
+            const wall = new THREE.Mesh(new THREE.BoxGeometry(...w.scale), wallMat);
+            wall.position.set(...w.pos);
+            mapGroup.add(wall);
+        });
+
+        // Obstacles
+        const boxMat = new THREE.MeshStandardMaterial({ color: 0x777777 });
+        for(let i = 0; i < 5; i++) {
+            const box = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), boxMat);
+            box.position.set((Math.random() - 0.5) * 20, 1, (Math.random() - 0.5) * 20);
+            mapGroup.add(box);
+        }
+
+        // Initialize Modules
+        setupMovement(camera, renderer, scene);
+        const gun = setupGun(camera);
+        const hostage = setupHostage(scene, camera);
+
+        // UI Buttons
+        const bindAction = (id, action) => {
+            const btn = document.getElementById(id);
+            btn.addEventListener('touchstart', (e) => { e.preventDefault(); action(); });
+            btn.addEventListener('mousedown', (e) => { e.preventDefault(); action(); });
+        };
+
+        bindAction('shoot-btn', shootGun);
+        bindAction('slide-btn', () => { playerState.isSliding = true; });
+        bindAction('dive-btn', () => { playerState.isDiving = true; });
+        bindAction('grab-btn', toggleGrab);
+
+        // Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Game Loop
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            
+            updateMovement(delta);
+            updateGun(delta);
+            updateHostage(delta);
+
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
