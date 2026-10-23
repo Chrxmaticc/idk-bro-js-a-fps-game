@@ -5,50 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Breakout Prototype</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #111; touch-action: none; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { margin: 0; overflow: hidden; background-color: #111; touch-action: none; font-family: 'Segoe UI', sans-serif; }
         canvas { display: block; }
-        #crosshair {
-            position: absolute; top: 50%; left: 50%; width: 4px; height: 4px;
-            background: #fff; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none;
-            box-shadow: 0 0 2px #000;
-        }
-        #ui { position: absolute; top: 20px; left: 20px; color: #fff; font-size: 24px; font-weight: bold; text-shadow: 2px 2px 0 #000; pointer-events: none; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: #fff; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; box-shadow: 0 0 2px #000; z-index: 10; }
+        #ui { position: absolute; top: 20px; left: 20px; color: #fff; font-size: 24px; font-weight: bold; text-shadow: 2px 2px 0 #000; pointer-events: none; z-index: 10; }
         
-        /* Joystick */
-        #joystick-zone { position: absolute; bottom: 0; left: 0; width: 50%; height: 50%; }
-        #joystick-base {
-            position: absolute; bottom: 40px; left: 40px; width: 120px; height: 120px;
-            background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3);
-            border-radius: 50%; display: none; pointer-events: none;
-        }
-        #joystick-knob {
-            position: absolute; top: 50%; left: 50%; width: 50px; height: 50px;
-            background: rgba(255,255,255,0.5); border-radius: 50%;
-            transform: translate(-50%, -50%); pointer-events: none;
-        }
+        #joystick-zone { position: absolute; bottom: 0; left: 0; width: 50%; height: 50%; z-index: 20; }
+        #joystick-base { position: absolute; bottom: 40px; left: 40px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; display: none; pointer-events: none; }
+        #joystick-knob { position: absolute; top: 50%; left: 50%; width: 50px; height: 50px; background: rgba(255,255,255,0.5); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
 
-        /* Buttons */
-        #controls { position: absolute; bottom: 30px; right: 20px; display: flex; flex-wrap: wrap; gap: 15px; justify-content: flex-end; width: 180px;}
-        .btn {
-            width: 60px; height: 60px; background: rgba(30, 30, 30, 0.6);
-            border: 2px solid rgba(255, 255, 255, 0.4); border-radius: 50%;
-            color: white; font-size: 12px; font-weight: bold; display: flex; align-items: center;
-            justify-content: center; user-select: none; text-align: center; backdrop-filter: blur(4px);
-        }
+        #controls { position: absolute; bottom: 20px; right: 15px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; width: 200px; z-index: 20;}
+        .btn { width: 50px; height: 50px; background: rgba(30, 30, 30, 0.7); border: 2px solid rgba(255, 255, 255, 0.4); border-radius: 50%; color: white; font-size: 10px; font-weight: bold; display: flex; align-items: center; justify-content: center; user-select: none; text-align: center; backdrop-filter: blur(4px); }
         .btn:active { background: rgba(255, 255, 255, 0.3); transform: scale(0.95); }
-        #shoot-btn { background: rgba(200, 0, 0, 0.4); border-color: #ff4444; width: 80px; height: 80px; font-size: 16px;}
-        #grab-btn { background: rgba(0, 100, 200, 0.4); border-color: #44aaff; }
+        #shoot-btn { background: rgba(200, 0, 0, 0.5); border-color: #ff4444; width: 65px; height: 65px; font-size: 14px; }
+        #grab-btn { background: rgba(0, 100, 200, 0.5); border-color: #44aaff; }
+        .lean-btn { background: rgba(255, 255, 255, 0.15); }
     </style>
 </head>
 <body>
     <div id="crosshair"></div>
     <div id="ui">🔫 1911: <span id="ammo">7</span></div>
     
-    <div id="joystick-zone">
-        <div id="joystick-base"><div id="joystick-knob"></div></div>
-    </div>
+    <div id="joystick-zone"><div id="joystick-base"><div id="joystick-knob"></div></div></div>
 
     <div id="controls">
+        <div class="btn lean-btn" id="lean-left-btn">LEAN L</div>
+        <div class="btn lean-btn" id="lean-right-btn">LEAN R</div>
+        <div class="btn" id="inspect-btn">INSPECT</div>
         <div class="btn" id="slide-btn">SLIDE</div>
         <div class="btn" id="dive-btn">DIVE</div>
         <div class="btn" id="grab-btn">GRAB</div>
@@ -56,31 +39,33 @@
     </div>
 
     <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-            }
-        }
+        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
     </script>
 
     <script type="module">
         import * as THREE from 'three';
         import { updateMovement, setupMovement, playerState } from './movement.js';
-        import { setupGun, updateGun, shootGun } from './guns.js';
+        import { setupGun, updateGun, shootGun, inspectGun } from './guns.js';
         import { setupHostage, updateHostage, toggleGrab } from './hostage.js';
 
-        // Setup Scene
+        // Scene Setup
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x1a1a1a);
         scene.fog = new THREE.Fog(0x1a1a1a, 15, 60);
 
-        const camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.01, 100);
-        camera.position.set(0, 1.6, 10);
+        // The Player Object (Moves around the world)
+        const player = new THREE.Object3D();
+        player.position.set(0, 0, 10);
+        scene.add(player);
+
+        // The Camera (Attached to the player)
+        const camera = new THREE.PerspectiveCamera(85, window.innerWidth / window.innerHeight, 0.01, 100);
+        camera.position.y = 1.6; // Eye height
+        player.add(camera);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true; // Enable shadows for realism
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
 
         // Lighting
@@ -88,61 +73,51 @@
         const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
         dirLight.position.set(10, 20, 10);
         dirLight.castShadow = true;
-        dirLight.shadow.mapSize.width = 1024;
-        dirLight.shadow.mapSize.height = 1024;
         scene.add(dirLight);
 
-        // --- PROCEDURAL TEXTURES ---
-        function createGridTexture(color1, color2) {
-            const canvas = document.createElement('canvas');
-            canvas.width = 256; canvas.height = 256;
+        // Textures & Map
+        function createGridTexture(c1, c2) {
+            const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256;
             const ctx = canvas.getContext('2d');
-            ctx.fillStyle = color1; ctx.fillRect(0,0,256,256);
-            ctx.fillStyle = color2;
+            ctx.fillStyle = c1; ctx.fillRect(0,0,256,256);
+            ctx.fillStyle = c2;
             for(let i=0; i<256; i+=64) { for(let j=0; j<256; j+=64) { ctx.fillRect(i, j, 2, 64); ctx.fillRect(i, j, 64, 2); } }
-            // Add noise
-            for(let i=0; i<1000; i++) { ctx.fillStyle = `rgba(0,0,0,${Math.random()*0.1})`; ctx.fillRect(Math.random()*256, Math.random()*256, 2, 2); }
             const tex = new THREE.CanvasTexture(canvas);
             tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
             tex.repeat.set(10, 10);
             return tex;
         }
 
-        // --- MAP GENERATION ---
-        const mapGroup = new THREE.Group();
-        scene.add(mapGroup);
-
         const floorMat = new THREE.MeshStandardMaterial({ map: createGridTexture('#333', '#222'), roughness: 0.8 });
         const floor = new THREE.Mesh(new THREE.BoxGeometry(50, 1, 50), floorMat);
         floor.position.y = -0.5; floor.receiveShadow = true;
-        mapGroup.add(floor);
+        scene.add(floor);
 
         const wallMat = new THREE.MeshStandardMaterial({ map: createGridTexture('#444', '#555'), roughness: 0.9 });
-        const wallPositions = [
+        const walls = [
             { pos: [0, 3, -25], scale: [50, 6, 1] }, { pos: [0, 3, 25], scale: [50, 6, 1] },
             { pos: [-25, 3, 0], scale: [1, 6, 50] }, { pos: [25, 3, 0], scale: [1, 6, 50] }
         ];
-        wallPositions.forEach(w => {
+        walls.forEach(w => {
             const wall = new THREE.Mesh(new THREE.BoxGeometry(...w.scale), wallMat);
             wall.position.set(...w.pos); wall.receiveShadow = true; wall.castShadow = true;
-            mapGroup.add(wall);
+            scene.add(wall);
         });
 
-        // Obstacles (Crates)
         const crateMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.9 });
         for(let i = 0; i < 6; i++) {
             const box = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), crateMat);
             box.position.set((Math.random() - 0.5) * 30, 1, (Math.random() - 0.5) * 30);
             box.castShadow = true; box.receiveShadow = true;
-            mapGroup.add(box);
+            scene.add(box);
         }
 
-        // Initialize Modules
-        setupMovement(camera, renderer, scene);
-        const gun = setupGun(camera);
-        const hostage = setupHostage(scene, camera);
+        // Initialize Systems
+        setupMovement(player, camera, renderer, scene);
+        setupGun(camera);
+        setupHostage(scene, camera);
 
-        // UI Buttons
+        // Button Bindings
         const bindAction = (id, action) => {
             const btn = document.getElementById(id);
             btn.addEventListener('touchstart', (e) => { e.preventDefault(); action(); });
@@ -153,6 +128,15 @@
         bindAction('slide-btn', () => { playerState.isSliding = true; });
         bindAction('dive-btn', () => { playerState.isDiving = true; });
         bindAction('grab-btn', toggleGrab);
+        bindAction('inspect-btn', inspectGun);
+        bindAction('lean-left-btn', () => playerState.lean = -1);
+        bindAction('lean-right-btn', () => playerState.lean = 1);
+        
+        // Reset lean on release
+        document.getElementById('lean-left-btn').addEventListener('touchend', () => playerState.lean = 0);
+        document.getElementById('lean-right-btn').addEventListener('touchend', () => playerState.lean = 0);
+        document.getElementById('lean-left-btn').addEventListener('mouseup', () => playerState.lean = 0);
+        document.getElementById('lean-right-btn').addEventListener('mouseup', () => playerState.lean = 0);
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
